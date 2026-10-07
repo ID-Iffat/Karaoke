@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Karaoke Night</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <form id="search-form" class="search" autocomplete="off">
+      <input id="query" type="search" placeholder="Song name and artist, e.g. Bohemian Rhapsody Queen" required>
+      <button type="submit">Search</button>
+    </form>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+  </header>
+
+  <main class="layout">
+    <section class="left">
+      <!-- YouTube IFrame Player API mounts here -->
+      <div class="player-box">
+        <div id="yt-player"></div>
+      </div>
+
+      <div class="timeline">
+        <span id="time-now">0:00</span>
+        <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+        <span id="time-total">0:00</span>
+      </div>
+
+      <div class="controls">
+        <button id="btn-back" type="button" aria-label="Back 10 seconds">&#x27F2; 10s</button>
+        <button id="btn-play" type="button" class="primary" aria-label="Play or pause">&#9654;</button>
+        <button id="btn-fwd" type="button" aria-label="Forward 10 seconds">10s &#x27F3;</button>
+      </div>
+
+      <div class="delay">
+        <span class="label">Lyrics delay</span>
+        <button type="button" data-step="-0.5">-0.5</button>
+        <button type="button" data-step="-0.1">-0.1</button>
+        <output id="delay-value">0.0s</output>
+        <button type="button" data-step="0.1">+0.1</button>
+        <button type="button" data-step="0.5">+0.5</button>
+        <button type="button" id="delay-reset" class="ghost">Reset</button>
+      </div>
+      <p class="hint" id="length-note"></p>
+
+      <h2>Instrumental versions</h2>
+      <ol id="results" class="results"></ol>
+
+      <details id="link-details" class="fallback">
+        <summary>Paste an instrumental link instead</summary>
+        <form id="link-form" class="search small" autocomplete="off">
+          <input id="link" type="text" placeholder="https://www.youtube.com/watch?v=...">
+          <button type="submit">Load</button>
+        </form>
+      </details>
+    </section>
+
+    <section class="right">
+      <div class="lyrics-head">
+        <form id="lyrics-form" class="lyrics-form" autocomplete="off">
+          <input id="lyrics-track" type="search" placeholder="Song name" required>
+          <input id="lyrics-artist" type="search" placeholder="Artist (optional)">
+          <button type="submit">Find</button>
+        </form>
+        <div id="lyrics-meta" class="meta">No song loaded</div>
+        <select id="lyrics-select" aria-label="Choose lyrics version" hidden></select>
+      </div>
+      <div id="lyrics" class="lyrics"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
