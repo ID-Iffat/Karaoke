@@ -10,18 +10,37 @@
   <header class="topbar">
     <form id="search-form" class="search" autocomplete="off">
       <input id="query" type="search" placeholder="Song name and artist, e.g. Bohemian Rhapsody Queen" required>
+      <label class="check" for="instr" title="Add &quot;instrumental&quot; to the search">
+        <input id="instr" type="checkbox" checked>
+        <span>Instrumental</span>
+      </label>
       <button type="submit">Search</button>
     </form>
     <div id="status" class="status" role="status" aria-live="polite"></div>
   </header>
 
+  <!-- Desktop: video + buttons + list on the left, lyrics on the right.
+       Mobile order: video, list, buttons, lyrics (see grid areas in style.css). -->
   <main class="layout">
-    <section class="left">
-      <!-- YouTube IFrame Player API mounts here -->
-      <div class="player-box">
-        <div id="yt-player"></div>
-      </div>
+    <!-- YouTube IFrame Player API mounts here -->
+    <div class="player-box">
+      <div id="yt-player"></div>
+    </div>
 
+    <section class="list-panel">
+      <h2>Search results</h2>
+      <ol id="results" class="results"></ol>
+
+      <details id="link-details" class="fallback">
+        <summary>Paste an instrumental link instead</summary>
+        <form id="link-form" class="search small" autocomplete="off">
+          <input id="link" type="text" placeholder="https://www.youtube.com/watch?v=...">
+          <button type="submit">Load</button>
+        </form>
+      </details>
+    </section>
+
+    <section class="controls-panel">
       <div class="timeline">
         <span id="time-now">0:00</span>
         <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
@@ -34,6 +53,13 @@
         <button id="btn-fwd" type="button" aria-label="Forward 10 seconds">10s &#x27F3;</button>
       </div>
 
+      <div class="volume">
+        <button id="btn-mute" type="button" aria-label="Mute or unmute">&#128266;</button>
+        <input id="vol" type="range" min="0" max="100" value="100" aria-label="Volume">
+        <output id="vol-value" for="vol">100</output>
+      </div>
+      <p class="hint" id="volume-note" hidden>On iPhone and iPad the page can't change YouTube's volume. Use the device volume buttons.</p>
+
       <div class="delay">
         <span class="label">Lyrics delay</span>
         <button type="button" data-step="-0.5">-0.5</button>
@@ -44,20 +70,9 @@
         <button type="button" id="delay-reset" class="ghost">Reset</button>
       </div>
       <p class="hint" id="length-note"></p>
-
-      <h2>Instrumental versions</h2>
-      <ol id="results" class="results"></ol>
-
-      <details id="link-details" class="fallback">
-        <summary>Paste an instrumental link instead</summary>
-        <form id="link-form" class="search small" autocomplete="off">
-          <input id="link" type="text" placeholder="https://www.youtube.com/watch?v=...">
-          <button type="submit">Load</button>
-        </form>
-      </details>
     </section>
 
-    <section class="right">
+    <section class="lyrics-panel">
       <div class="lyrics-head">
         <form id="lyrics-form" class="lyrics-form" autocomplete="off">
           <input id="lyrics-track" type="search" placeholder="Song name" required>

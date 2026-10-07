@@ -8,6 +8,11 @@
   --accent-2: #7c5cff;
   --danger: #ff6b6b;
   --radius: 14px;
+
+  /* video list: exactly 3 rows visible, the rest scrolls */
+  --row-h: 72px;
+  --row-gap: 8px;
+  --list-pad: 3px;
 }
 
 * { box-sizing: border-box; }
@@ -32,6 +37,7 @@ button {
 }
 button:hover { background: #2a2e52; }
 button:active { transform: scale(.97); }
+button:disabled { opacity: .45; cursor: not-allowed; }
 button.ghost { background: transparent; border-color: var(--panel-2); color: var(--dim); }
 
 input[type="search"], input[type="text"], select {
@@ -47,7 +53,7 @@ input:focus, select:focus, button:focus-visible {
   outline-offset: 1px;
 }
 
-/* top bar */
+/* ------------------------------ top bar ------------------------------ */
 .topbar {
   position: sticky;
   top: 0;
@@ -55,30 +61,61 @@ input:focus, select:focus, button:focus-visible {
   background: linear-gradient(var(--bg) 80%, transparent);
   padding: 14px 16px 10px;
 }
-.search { display: flex; gap: 8px; max-width: 900px; margin: 0 auto; }
-.search input { flex: 1; }
+.search { display: flex; gap: 8px; max-width: 900px; margin: 0 auto; align-items: stretch; }
+.search input[type="search"],
+.search input[type="text"] { flex: 1; }
 .search button { background: linear-gradient(135deg, var(--accent), var(--accent-2)); font-weight: 600; }
 .search.small { margin: 10px 0 0; max-width: none; }
+
+/* "Instrumental" checkbox beside the search bar */
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-2);
+  border-radius: 10px;
+  font-size: .9rem;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.check:has(input:checked) { border-color: var(--accent); }
+
 .status {
   max-width: 900px;
   margin: 8px auto 0;
   min-height: 1.2em;
   font-size: .9rem;
   color: var(--dim);
+  overflow-wrap: anywhere;
 }
 .status.error { color: var(--danger); }
 
-/* layout */
+/* ------------------------------- layout ------------------------------ */
+/* Desktop: left column = video, buttons, list. Right column = lyrics. */
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-rows: auto auto auto 1fr;
+  grid-template-areas:
+    "video    lyrics"
+    "controls lyrics"
+    "list     lyrics"
+    "spare    lyrics";
+  column-gap: 20px;
   max-width: 1300px;
   margin: 0 auto;
   padding: 8px 16px 32px;
 }
 
-.left, .right { min-width: 0; }
+.player-box { grid-area: video; }
+.controls-panel { grid-area: controls; }
+.list-panel { grid-area: list; }
+.lyrics-panel { grid-area: lyrics; }
+.player-box, .controls-panel, .list-panel, .lyrics-panel { min-width: 0; }
 
 .player-box {
   aspect-ratio: 16 / 9;
@@ -90,7 +127,7 @@ input:focus, select:focus, button:focus-visible {
 .player-box iframe,
 .player-box #yt-player { width: 100%; height: 100%; display: block; border: 0; }
 
-/* timeline + controls */
+/* ------------------------ timeline + controls ------------------------ */
 .timeline {
   display: flex;
   align-items: center;
@@ -119,6 +156,24 @@ input:focus, select:focus, button:focus-visible {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
 }
 
+/* volume, right under the play buttons */
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 360px;
+  margin: 14px auto 0;
+}
+.volume button { padding: 6px 10px; min-width: 44px; font-size: 1.1rem; line-height: 1.2; }
+.volume input[type="range"] { flex: 1; min-width: 0; height: 28px; accent-color: var(--accent); }
+.volume output {
+  min-width: 2.4em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: .85rem;
+  color: var(--dim);
+}
+
 .delay {
   display: flex;
   align-items: center;
@@ -131,30 +186,62 @@ input:focus, select:focus, button:focus-visible {
 .delay button { padding: 6px 10px; font-size: .85rem; }
 .delay output { min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
 .hint { text-align: center; color: var(--dim); font-size: .8rem; min-height: 1.1em; margin: 6px 0 0; }
+.hint[hidden] { display: none; }
 
 h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin: 22px 0 8px; }
+.list-panel h2 { margin-top: 20px; }
 
-/* results */
-.results { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+/* ----------------------------- video list ----------------------------- */
+/* Shows exactly 3 rows; scroll for more. */
+.results {
+  list-style: none;
+  margin: 0;
+  padding: var(--list-pad);
+  display: grid;
+  gap: var(--row-gap);
+  align-content: start;
+  max-height: calc(var(--row-h) * 3 + var(--row-gap) * 2 + var(--list-pad) * 2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  scrollbar-width: thin;
+}
 .results li button {
   display: flex;
   gap: 12px;
   width: 100%;
+  height: var(--row-h);
   text-align: left;
   align-items: center;
   background: var(--panel);
   padding: 8px;
 }
 .results li.active button { border-color: var(--accent); background: var(--panel-2); }
-.results img { width: 96px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; flex: none; background: #000; }
-.results .t { font-size: .9rem; line-height: 1.25; }
-.results .c { font-size: .78rem; color: var(--dim); margin-top: 2px; }
+.results img { width: 96px; height: 54px; object-fit: cover; border-radius: 6px; flex: none; background: #000; }
+.results li button > div { min-width: 0; }
+.results .t {
+  font-size: .9rem;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.results .c {
+  font-size: .78rem;
+  color: var(--dim);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-.fallback { margin-top: 16px; color: var(--dim); font-size: .9rem; }
+.fallback { margin-top: 14px; color: var(--dim); font-size: .9rem; }
 .fallback summary { cursor: pointer; }
 
-/* lyrics */
-.right {
+/* ------------------------------- lyrics ------------------------------- */
+.lyrics-panel {
   background: var(--panel);
   border-radius: var(--radius);
   display: flex;
@@ -162,6 +249,7 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: 
   height: calc(100vh - 120px);
   position: sticky;
   top: 90px;
+  align-self: start;
   overflow: hidden;
 }
 .lyrics-head {
@@ -207,10 +295,40 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: 
 .line.empty { font-size: 1rem; opacity: .5; }
 .placeholder { color: var(--dim); padding: 0 12px; font-size: 1rem; }
 
-/* phones and narrow windows */
+/* ------------------------- phones, narrow windows ------------------------- */
+/* Top to bottom: search bar, video, video list, player buttons, lyrics */
 @media (max-width: 860px) {
-  .layout { grid-template-columns: 1fr; gap: 16px; }
-  .right { position: static; height: 55vh; }
+  .topbar { position: static; padding: 12px 12px 6px; }
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas:
+      "video"
+      "list"
+      "controls"
+      "lyrics";
+    padding: 4px 12px 24px;
+  }
+  .player-box { margin-top: 4px; }
+  .list-panel h2 { margin-top: 14px; }
+  .controls-panel { margin-top: 6px; }
+  .lyrics-panel {
+    position: static;
+    height: 60vh;
+    min-height: 320px;
+    margin-top: 18px;
+  }
   .lyrics { padding: 18vh 16px; }
   .line { font-size: 1.2rem; }
+}
+
+/* very narrow: input on its own row, checkbox + button share the next */
+@media (max-width: 560px) {
+  #search-form { flex-wrap: wrap; }
+  #search-form input[type="search"] { flex: 1 1 100%; }
+  #search-form .check { flex: 1; justify-content: center; padding: 10px 12px; }
+  #search-form button { flex: 0 0 120px; }
+  .controls { gap: 10px; }
+  .controls button { min-width: 76px; }
+  .results img { width: 88px; height: 50px; }
 }

@@ -11,6 +11,7 @@ const $ = (id) => document.getElementById(id);
 const els = {
   form: $("search-form"),
   query: $("query"),
+  instr: $("instr"),
   status: $("status"),
   seek: $("seek"),
   timeNow: $("time-now"),
@@ -18,6 +19,10 @@ const els = {
   back: $("btn-back"),
   play: $("btn-play"),
   fwd: $("btn-fwd"),
+  mute: $("btn-mute"),
+  vol: $("vol"),
+  volValue: $("vol-value"),
+  volumeNote: $("volume-note"),
   delayValue: $("delay-value"),
   delayReset: $("delay-reset"),
   lengthNote: $("length-note"),
@@ -44,6 +49,9 @@ const state = {
   activeIdx: -1,
   delay: 0,
   dragging: false,
+  instrumental: true, // was the current search an instrumental search?
+  volume: 100,
+  lastVolume: 100,
 };
 
 /* ---------------------------- helpers ---------------------------- */
@@ -76,6 +84,64 @@ function extractVideoId(input) {
 function store(key, value) { try { localStorage.setItem(key, value); } catch (_) {} }
 function load(key) { try { return localStorage.getItem(key); } catch (_) { return null; } }
 
+/* --------------------------- title cleaning ---------------------------- */
+/* text-cleaning-start */
+
+// Empty brackets left behind after a word was removed, e.g. "Song ()"
+const EMPTY_BRACKETS_RE = /[\(\[\{（【]\s*[\)\]\}）】]/g;
+
+// Tidy a string: drop empty brackets, collapse spaces, trim stray separators
+function tidy(s) {
+  return s
+    .replace(EMPTY_BRACKETS_RE, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s\-–—|:~]+|[\s\-–—|:~]+$/g, "")
+    .trim();
+}
+
+// Removes only "instrumental" / "karaoke", including the whole bracket they sit in:
+// "Song (Instrumental)" -> "Song", "Song [Karaoke Version]" -> "Song"
+function stripInstrumental(s) {
+  return tidy(
+    String(s || "")
+      .replace(/[\(\[\{（【][^\)\]\}）】]*\b(?:instrumental|karaoke)\b[^\)\]\}）】]*[\)\]\}）】]/gi, " ")
+      .replace(/\b(?:instrumental|karaoke)\b/gi, " ")
+  );
+}
+
+// Removes all the usual video-title noise (brackets with tags, bare tag words)
+function stripNoise(s) {
+  return tidy(
+    String(s || "")
+      .replace(/[\(\[\{（【][^\)\]\}）】]*\b(?:karaoke|instrumental|backing|lyrics?|official|audio|video|hd|hq|4k|no vocals?|vocals?|cover|remaster\w*|version|sing[- ]?along|minus one)\b[^\)\]\}）】]*[\)\]\}）】]/gi, " ")
+      .replace(/\b(?:karaoke|instrumental|backing track|sing[- ]?along|no vocals?|with lyrics|lyrics|official (?:music )?video|official audio|hd|hq|4k)\b/gi, " ")
+  );
+}
+
+function extractTrackArtist(rawTitle, channelName) {
+  let s = rawTitle || "";
+  let artist = "";
+
+  const perf = s.match(/[\(\[]?\s*(?:originally\s+)?(?:performed|made famous|popularized|sung)\s+by\s+([^\)\]\-|]+)[\)\]]?/i);
+  if (perf) { artist = perf[1].trim(); s = s.replace(perf[0], " "); }
+
+  // Clean first (this also trims stray separators), then split "Artist - Song"
+  s = stripNoise(s);
+
+  if (!artist) {
+    const parts = s.split(/\s[-–—|~]\s/);
+    if (parts.length >= 2) {
+      artist = parts[0].trim();
+      s = parts.slice(1).join(" ").trim();
+    } else if (channelName) {
+      artist = channelName.replace(/\s*-\s*Topic$|VEVO$/i, "").trim();
+    }
+  }
+
+  return { track: tidy(s), artist: artist };
+}
+/* text-cleaning-end */
+
 /* ------------------------ YouTube IFrame player ------------------ */
 
 let ytPlayer = null;
@@ -88,7 +154,7 @@ window.onYouTubeIframeAPIReady = () => {
     height: "100%",
     playerVars: { controls: 0, disablekb: 1, rel: 0, playsinline: 1, modestbranding: 1 },
     events: {
-      onReady: () => ytReadyResolve(),
+      onReady: (e) => { ytReadyResolve(); e.target.setVolume(state.volume); },
       onStateChange: onPlayerState,
       onError: onPlayerError,
     },
@@ -106,11 +172,13 @@ function onPlayerState(e) {
 }
 
 // Codes: 2 invalid id, 5 HTML5 error, 100 not found/private,
-// 101 and 150 = owner disabled embedding.
+// 101 and 150 = embedding blocked (owner setting, age/region/licensing),
+// 153 = player config / referrer problem.
 function onPlayerError(e) {
   const code = e.data;
   const reason =
-    code === 101 || code === 150 ? "embedding is disabled for this video"
+    code === 101 || code === 150 ? "it can't be embedded here"
+    : code === 153 ? "the player couldn't verify this site"
     : code === 100 ? "video not found or private"
     : "it can't be played here";
   const next = state.resultIndex + 1;
@@ -132,6 +200,58 @@ function playerDuration() {
 function isPlaying() {
   return ytPlayer && ytPlayer.getPlayerState && ytPlayer.getPlayerState() === 1;
 }
+
+/* ------------------------------ volume --------------------------- */
+
+// iPhones/iPads ignore setVolume on embedded YouTube; hardware buttons only.
+const IS_IOS =
+  /iP(hone|ad|od)/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+function volumeIcon(v) {
+  if (v === 0) return "\u{1F507}";  // muted
+  if (v < 40) return "\u{1F508}";   // low
+  if (v < 75) return "\u{1F509}";   // medium
+  return "\u{1F50A}";               // high
+}
+
+function applyVolume() {
+  if (!ytPlayer || !ytPlayer.setVolume) return;
+  ytPlayer.setVolume(state.volume);
+  if (state.volume > 0 && ytPlayer.isMuted && ytPlayer.isMuted()) ytPlayer.unMute();
+}
+
+function renderVolume() {
+  els.vol.value = String(state.volume);
+  els.volValue.textContent = String(state.volume);
+  els.mute.textContent = volumeIcon(state.volume);
+}
+
+function setVolume(v) {
+  state.volume = Math.max(0, Math.min(100, Math.round(v)));
+  if (state.volume > 0) state.lastVolume = state.volume;
+  store("karaoke:volume", String(state.volume));
+  renderVolume();
+  applyVolume();
+}
+
+els.vol.addEventListener("input", () => setVolume(Number(els.vol.value)));
+els.mute.addEventListener("click", () => {
+  setVolume(state.volume > 0 ? 0 : state.lastVolume || 60);
+});
+
+(function initVolume() {
+  const saved = parseInt(load("karaoke:volume"), 10);
+  state.volume = isFinite(saved) ? Math.max(0, Math.min(100, saved)) : 100;
+  state.lastVolume = state.volume || 100;
+  renderVolume();
+  if (IS_IOS) {
+    els.vol.disabled = true;
+    els.mute.disabled = true;
+    els.volValue.textContent = "";
+    els.volumeNote.hidden = false;
+  }
+})();
 
 /* ----------------------------- lyrics ---------------------------- */
 
@@ -250,6 +370,7 @@ async function searchYouTube(q) {
 }
 
 function renderResults() {
+  const prevScroll = els.results.scrollTop;
   els.results.innerHTML = "";
   state.results.forEach((r, i) => {
     const li = document.createElement("li");
@@ -277,6 +398,18 @@ function renderResults() {
     li.appendChild(btn);
     els.results.appendChild(li);
   });
+
+  // keep the list where it was, then make sure the active row is visible
+  els.results.scrollTop = prevScroll;
+  const a = els.results.querySelector("li.active");
+  if (a) {
+    const top = a.offsetTop;
+    const bottom = top + a.offsetHeight;
+    if (top < els.results.scrollTop) els.results.scrollTop = top;
+    else if (bottom > els.results.scrollTop + els.results.clientHeight) {
+      els.results.scrollTop = bottom - els.results.clientHeight;
+    }
+  }
 }
 
 function loadVideo(i) {
@@ -288,7 +421,10 @@ function loadVideo(i) {
 
   const id = state.videoId;
   ytReady.then(() => {
-    if (state.videoId === id) ytPlayer.loadVideoById(id);
+    if (state.videoId === id) {
+      ytPlayer.loadVideoById(id);
+      applyVolume();
+    }
   });
 }
 
@@ -372,8 +508,9 @@ function tick() {
 
   if (dur > 0 && state.current && !els.lengthNote.textContent) {
     const diff = Math.abs(dur - state.current.duration);
+    const label = state.instrumental ? "Instrumental" : "Video";
     els.lengthNote.textContent =
-      `Original ${fmt(state.current.duration)} | Instrumental ${fmt(dur)}` +
+      `Original ${fmt(state.current.duration)} | ${label} ${fmt(dur)}` +
       (diff > 4 ? " - adjust the lyrics delay if the intro differs." : "");
   }
 }
@@ -410,31 +547,14 @@ els.lyricsSelect.addEventListener("change", () => {
   if (c) { applyLyrics(c); els.lengthNote.textContent = ""; }
 });
 
+/* ------------------- instrumental checkbox (saved) ---------------- */
+
+els.instr.checked = load("karaoke:instrumental") !== "0"; // default: on
+els.instr.addEventListener("change", () => {
+  store("karaoke:instrumental", els.instr.checked ? "1" : "0");
+});
+
 /* --------------------- title -> lyrics lookup -------------------- */
-
-function extractTrackArtist(rawTitle, channelName) {
-  let s = rawTitle || "";
-  let artist = "";
-
-  const perf = s.match(/[\(\[]?\s*(?:originally\s+)?(?:performed|made famous|popularized|sung)\s+by\s+([^\)\]\-|]+)[\)\]]?/i);
-  if (perf) { artist = perf[1].trim(); s = s.replace(perf[0], " "); }
-
-  s = s.replace(/[\(\[\{][^\)\]\}]*\b(karaoke|instrumental|backing|lyrics?|official|audio|video|hd|hq|4k|no vocals?|vocals?|cover|remaster\w*|version|sing[- ]?along|minus one)\b[^\)\]\}]*[\)\]\}]/gi, " ");
-  s = s.replace(/\b(karaoke|instrumental|backing track|sing[- ]?along|no vocals?|with lyrics|lyrics|official (?:music )?video|official audio|hd|hq|4k)\b/gi, " ");
-
-  if (!artist) {
-    const parts = s.split(/\s[-–—|~]\s/);
-    if (parts.length >= 2) {
-      artist = parts[0].trim();
-      s = parts.slice(1).join(" ").trim();
-    } else if (channelName) {
-      artist = channelName.replace(/\s*-\s*Topic$|VEVO$/i, "").trim();
-    }
-  }
-
-  s = s.replace(/\s{2,}/g, " ").replace(/^[\s\-–—|:]+|[\s\-–—|:]+$/g, "").trim();
-  return { track: s, artist: artist };
-}
 
 // Public oEmbed gives the full, untruncated title without needing an API key
 async function fetchVideoInfo(id) {
@@ -449,13 +569,19 @@ async function fetchVideoInfo(id) {
   return { title: "Unknown Song", author: "" };
 }
 
-async function findLyrics(track, artist) {
+async function findLyrics(rawTrack, artist) {
+  // Always clean the name here, so it also covers text typed into the lyrics box:
+  // "Song Title (Instrumental)" -> "Song Title"
+  const original = (rawTrack || "").trim();
+  const track = stripNoise(original) || original;
+  const cleanArtist = (artist || "").trim();
+
   els.lyricsTrack.value = track;
-  els.lyricsArtist.value = artist || "";
+  els.lyricsArtist.value = cleanArtist;
   state.candidates = [];
   els.lyricsSelect.hidden = true;
   try {
-    state.candidates = await searchLyrics(track, artist);
+    state.candidates = await searchLyrics(track, cleanArtist);
   } catch (err) {
     setStatus(err.message, true);
   }
@@ -474,16 +600,22 @@ async function findLyrics(track, artist) {
 
 els.form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const q = els.query.value.trim();
-  if (!q) return;
+  const raw = els.query.value.trim();
+  if (!raw) return;
 
-  setStatus("Searching for an instrumental version...");
+  const wantInstr = els.instr.checked;
+  // With the box ticked, drop any "instrumental" the user typed so it isn't doubled
+  const q = wantInstr ? (stripInstrumental(raw) || raw) : raw;
+  const ytQuery = wantInstr ? `${q} ${CONFIG.SEARCH_SUFFIX}` : q;
+  state.instrumental = wantInstr;
+
+  setStatus(wantInstr ? "Searching for an instrumental version..." : "Searching...");
   try {
-    state.results = await searchYouTube(`${q} ${CONFIG.SEARCH_SUFFIX}`);
+    state.results = await searchYouTube(ytQuery);
     if (!state.results.length) {
       state.resultIndex = -1;
       renderResults();
-      setStatus("No playable instrumental found. Try a different search.", true);
+      setStatus(wantInstr ? "No playable instrumental found. Try a different search." : "No playable video found. Try a different search.", true);
       return;
     }
 
@@ -508,6 +640,7 @@ els.linkForm.addEventListener("submit", async (e) => {
   const id = extractVideoId(els.link.value);
   if (!id) return setStatus("That doesn't look like a YouTube link.", true);
 
+  state.instrumental = true;
   state.results = [{
     videoId: id,
     title: "Pasted link",
