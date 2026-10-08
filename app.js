@@ -4,9 +4,9 @@ const CONFIG = {
   SEARCH_PROXY: "https://karaoke.iffatadibamusaffa.workers.dev/",
   SEARCH_SUFFIX: "instrumental",
   LRCLIB: "https://lrclib.net/api/search",
-  KUROSHIRO_JS: "https://cdn.jsdelivr.net/npm/kuroshiro@1.2.0/dist/kuroshiro.min.js",
-  KUROMOJI_ANALYZER_JS: "https://cdn.jsdelivr.net/npm/kuroshiro-analyzer-kuromoji@1.1.0/dist/kuroshiro-analyzer-kuromoji.min.js",
-  KUROMOJI_DICT: "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/",
+  KUROSHIRO_JS: "https://unpkg.com/kuroshiro@1.2.0/dist/kuroshiro.min.js",
+  KUROMOJI_ANALYZER_JS: "https://unpkg.com/kuroshiro-analyzer-kuromoji@1.1.0/dist/kuroshiro-analyzer-kuromoji.min.js",
+  KUROMOJI_DICT: "https://unpkg.com/kuromoji@0.1.2/dict/",
 };
 
 const $ = (id) => document.getElementById(id);
