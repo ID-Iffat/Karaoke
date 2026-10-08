@@ -121,18 +121,28 @@ function stripNoise(s) {
 function extractTrackArtist(rawTitle, channelName) {
   let s = rawTitle || "";
   let artist = "";
+  
   const perf = s.match(/[([]?\s*(?:originally\s+)?(?:performed|made famous|popularized|sung)\s+by\s+([^)\]\-|]+)[)\]]?/i);
-  if (perf) { artist = perf[1].trim(); s = s.replace(perf[0], " "); }
+  if (perf) { 
+    artist = perf[1].trim(); 
+    s = s.replace(perf[0], " "); 
+  }
+  
   s = stripNoise(s);
+  
   if (!artist) {
     const parts = s.split(/\s[-–—|~]\s/);
     if (parts.length >= 2) {
       artist = parts[0].trim();
       s = parts.slice(1).join(" ").trim();
     } else if (channelName) {
-      artist = channelName.replace(/\s*-\s*Topic$\vert{}VEVO$/i, "").trim();
+      artist = channelName; 
     }
   }
+  
+  // AGGRESSIVE CLEANUP: Catches standard hyphens, en-dashes (–), and em-dashes (—)
+  artist = artist.replace(/\s*[-–—]\s*Topic\b|\s*VEVO\b/gi, "").trim();
+
   return { track: tidy(s), artist: artist };
 }
 
@@ -817,24 +827,30 @@ async function fetchVideoInfo(id) {
 async function findLyrics(rawTrack, artist) {
   const original = (rawTrack || "").trim();
   const track = stripNoise(original) || original;
-  const cleanArtist = (artist || "").trim();
+  
+  // Clean the artist name again just in case it was manually typed/pasted
+  let cleanArtist = (artist || "").trim();
+  cleanArtist = cleanArtist.replace(/\s*[-–—]\s*Topic\b|\s*VEVO\b/gi, "").trim();
 
   els.lyricsTrack.value = track;
   els.lyricsArtist.value = cleanArtist;
   state.candidates = [];
   els.lyricsSelect.hidden = true;
   els.syncRow.hidden = true;
+  
   try {
     state.candidates = await searchLyrics(track, cleanArtist);
   } catch (err) {
     setStatus(err.message, true);
   }
+  
   state.current = null;
   if (state.candidates.length) {
     fillCandidateSelect();
     applyLyrics(state.candidates[0]);
     return state.candidates[0];
   }
+  
   els.lyricsMeta.textContent = "No lyrics found";
   showPlaceholder("No lyrics found for this search. Try adjusting the song name or artist box above.");
   return null;
