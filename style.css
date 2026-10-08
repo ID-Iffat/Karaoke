@@ -21,7 +21,7 @@ html, body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
 }
 
 button, input, select { font: inherit; }
@@ -224,8 +224,9 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: 
   font-size: .9rem;
   line-height: 1.25;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
 }
 .results .c {
@@ -240,6 +241,8 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: 
 .fallback { margin-top: 14px; color: var(--dim); font-size: .9rem; }
 .fallback summary { cursor: pointer; }
 
+/* ... Keep the top of the CSS file identical ... */
+
 /* ------------------------------- lyrics ------------------------------- */
 .lyrics-panel {
   background: var(--panel);
@@ -252,6 +255,7 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: 
   align-self: start;
   overflow: hidden;
 }
+
 .lyrics-head {
   display: flex;
   gap: 10px;
@@ -259,42 +263,80 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: 
   flex-wrap: wrap;
   padding: 12px 16px;
   border-bottom: 1px solid var(--panel-2);
+  min-width: 0;
 }
-.lyrics-form { display: flex; gap: 8px; flex: 1 1 100%; }
-.lyrics-form input { flex: 1; padding: 8px 12px; font-size: .9rem; min-width: 0; }
-#lyrics-track { flex: 1.5; }
-.lyrics-form button { padding: 8px 12px; font-size: .85rem; flex-shrink: 0; }
+.lyrics-head > * { min-width: 0; }
+
+.lyrics-form { display: flex; gap: 8px; flex: 1 1 100%; width: 100%; }
+.lyrics-form input { flex: 1 1 0; width: 0; min-width: 0; padding: 8px 12px; font-size: .9rem; }
+#lyrics-track { flex-grow: 1.5; }
+.lyrics-form button { flex: 0 0 auto; padding: 8px 12px; font-size: .85rem; }
+
+.reading-row { display: flex; align-items: center; gap: 8px; flex: 1 1 100%; font-size: .85rem; color: var(--dim); }
+.reading-row select { flex: 1 1 0; min-width: 0; padding: 6px 10px; font-size: .85rem; }
+.reading-status { flex: 1 1 100%; font-size: .8rem; color: var(--dim); min-height: 0; }
+.reading-status:empty { display: none; }
+.reading-status.error { color: var(--danger); }
+
 .meta { flex: 1 1 100%; font-size: .9rem; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lyrics-head select { flex: 1 1 100%; width: 100%; padding: 6px 10px; font-size: .8rem; }
-.lyrics.plain .line { color: var(--text); cursor: default; transform: none; }
+
+/* New row for the Dropdown + Estimate Toggle */
+.sync-row { display: flex; align-items: center; gap: 8px; flex: 1 1 100%; }
+.sync-row select { flex: 1 1 0; min-width: 0; padding: 6px 10px; font-size: .8rem; }
+.sync-row .check { padding: 6px 10px; flex-shrink: 0; }
 
 .lyrics {
   position: relative;
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden; /* Ensures no horizontal scroll */
   padding: 30vh 20px;
   text-align: center;
   scrollbar-width: thin;
 }
+
 .line {
+  --base: #6f749c; 
+  --hl:   #6f749c;  
   padding: 8px 4px;
   font-size: 1.35rem;
   line-height: 1.35;
-  color: var(--dim);
+  color: var(--base);
   cursor: pointer;
-  transition: color .25s, transform .25s;
+  transition: transform .25s;
   transform-origin: center;
+  white-space: pre-wrap;     /* Forces long lyrics to wrap dynamically */
+  word-wrap: break-word;     /* Prevents single massive words from stretching screen */
 }
-.line.past { color: #4b4f78; }
+.lyrics.has-ruby .line { line-height: 1.95; }
+.line.past { --base: #4b4f78; --hl: #4b4f78; }
 .line.active {
-  color: var(--text);
+  --base: var(--text);   
+  --hl: var(--accent);   
   transform: scale(1.12);
-  text-shadow: 0 0 22px rgba(255, 79, 163, .55);
   font-weight: 650;
 }
 .line.empty { font-size: 1rem; opacity: .5; }
 .placeholder { color: var(--dim); padding: 0 12px; font-size: 1rem; }
 
+.line ruby { ruby-align: center; }
+.line rt { font-size: .5em; line-height: 1; font-weight: 500; letter-spacing: .02em; }
+.line rp { display: none; }
+.line .u.r { display: inline-block; }
+
+.line .u { --p: 0; }
+.line.past .u { --p: 100; }
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .lyrics:not(.plain) .line .u {
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    background-image: linear-gradient(90deg, var(--hl) calc(var(--p) * 1%), var(--base) calc(var(--p) * 1%));
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+}
+
+.lyrics.plain .line { --base: var(--text); --hl: var(--text); cursor: default; transform: none; }
 /* ------------------------- phones, narrow windows ------------------------- */
 /* Top to bottom: search bar, video, video list, player buttons, lyrics */
 @media (max-width: 860px) {
@@ -318,6 +360,7 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: 
     min-height: 320px;
     margin-top: 18px;
   }
+  .lyrics-head { padding: 10px 12px; gap: 8px; }
   .lyrics { padding: 18vh 16px; }
   .line { font-size: 1.2rem; }
 }
@@ -331,4 +374,11 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: 
   .controls { gap: 10px; }
   .controls button { min-width: 76px; }
   .results img { width: 88px; height: 50px; }
+}
+
+/* small phones: song + artist share a row, the Find button gets its own full-width row */
+@media (max-width: 400px) {
+  .lyrics-form { flex-wrap: wrap; }
+  .lyrics-form input { flex: 1 1 calc(50% - 4px); width: auto; }
+  .lyrics-form button { flex: 1 1 100%; }
 }

@@ -19,10 +19,7 @@
     <div id="status" class="status" role="status" aria-live="polite"></div>
   </header>
 
-  <!-- Desktop: video + buttons + list on the left, lyrics on the right.
-       Mobile order: video, list, buttons, lyrics (see grid areas in style.css). -->
   <main class="layout">
-    <!-- YouTube IFrame Player API mounts here -->
     <div class="player-box">
       <div id="yt-player"></div>
     </div>
@@ -79,8 +76,27 @@
           <input id="lyrics-artist" type="search" placeholder="Artist (optional)">
           <button type="submit">Find</button>
         </form>
+
+        <div class="reading-row">
+          <label for="reading-mode">Kanji</label>
+          <select id="reading-mode" aria-label="How to show kanji">
+            <option value="furigana">Furigana (above kanji)</option>
+            <option value="hiragana">Hiragana only</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+        <div id="reading-status" class="reading-status" role="status" aria-live="polite"></div>
+
         <div id="lyrics-meta" class="meta">No song loaded</div>
-        <select id="lyrics-select" aria-label="Choose lyrics version" hidden></select>
+        
+        <!-- NEW SYNC ROW: Groups the selector and the true/estimate sync toggle -->
+        <div class="sync-row" id="sync-row" hidden>
+          <select id="lyrics-select" aria-label="Choose lyrics version" hidden></select>
+          <label class="check" title="Highlight word-by-word even if exact timestamps are missing">
+            <input id="est-sync" type="checkbox" checked>
+            <span>Estimate Sync</span>
+          </label>
+        </div>
       </div>
       <div id="lyrics" class="lyrics"></div>
     </section>
